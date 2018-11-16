@@ -42,7 +42,7 @@ MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
 
 function getSignature(upc, auth) {
   var crypto    = require('crypto');
-  var algorithm = 'sha1';   //consider using sha256
+  var algorithm = 'sha1';   
   var hash, hmac;
 
   hmac = crypto.createHmac(algorithm, auth);
