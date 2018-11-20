@@ -13,7 +13,7 @@ getBarcodeInfo(upc, app_id);
 function getBarcodeInfo(barcode, app_id, format_sig) {
 
     var query = "http://digit-eyes.com/gtin/v2_0/?upc_code="+barcode+"&app_key="+app_id+"&signature="+signature+"&language=en&field_names=description,uom,usage,brand";
-    console.log(query);
+    console.log("HTTP query: "query);
 
     // above query works
     // need to get the data out in a JSON format

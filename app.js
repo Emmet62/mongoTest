@@ -1,53 +1,114 @@
+
+const request = require('request');
+var crypto    = require('crypto');
 const MongoClient = require('mongodb').MongoClient;
 const uri = "mongodb+srv://SenneS_Admin:SenneS2018@sennescluster-onimy.mongodb.net/SenneSDB"
 
+var upc = "012000018794";
+var FridgeID = "sampleFridgeID";
+//getBarcodeInfo(upc, FridgeID);
+getUpdates(FridgeID);
+
 function getBarcodeInfo(barcode) {
-    //TODO: Actually retrieve barcode information
-    // Use the digit-eyes REST API
 
-    var app_id = "/+QN4JxDkG59";
-    var user_key = "Hl11J8r8i7At5Bd4";
-    var signature = getSignature(barcode, user_key);
+    var query = "https://api.upcitemdb.com/prod/trial/lookup?upc="+barcode;
+    //console.log(query);
 
-    var query = "http://digit-eyes.com/gtin/v2_0/?upc_code="+barcode+"&app_key="+app_id+"&signature="+signature+"&language=en&field_names=description,uom,usage,brand";
-    // Call a JSON API with Node JS
-    // Return in the format needed for the addUpdate function
+    const options = {
+        url: query,
+        method: 'GET',
+        headers: {
+            'Accept': 'application/json',
+            'Accept-Charset': 'utf-8'
+        }
+    };
 
-    return {};
+    request(options, function(err, res, body) {
+        var obj = JSON.parse(body);
+        var title = obj.items[0].title;
+        var brand = obj.items[0].brand;
+        var size = obj.items[0].size;
+        var barcodeInfo = {
+          title: title,
+          brand: brand,
+          size: size
+        };
+        console.log(barcodeInfo);
+
+        // I had to combine these two functions as I could not work out how to access the returned dictionary
+
+        MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
+           if(err) {
+                console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
+           }
+           console.log('Connected...');
+
+           // create the collection object for inserting documents
+           const collection = client.db("SenneSDB").collection(FridgeID);
+
+           // populate the document with information from barcode database
+           var doc = { name: barcodeInfo.title , brand: barcodeInfo.brand, size: barcodeInfo.size };
+
+           // insert the document into the DB
+           collection.insertOne(doc, function(err, res) {
+            if (err) throw err;
+            console.log("Document inserted");
+
+           // need to update and return state
+           client.close();
+
+          });
+        });
+    });
 }
 
-MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
-   if(err) {
-        console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
-   }
-   console.log('Connected...');
+function addUpdate(item, FridgeID) {
 
-   // create the collection object for inserting documents
-   // collection will need to be filled with the FridgeID
-   const collection = client.db("SenneSDB").collection("sampleFridgeID");
+  MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
+     if(err) {
+          console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
+     }
+     console.log('Connected...');
 
-   // document to be inserted
-   // will need to be populated with information from the getBarcodeInfo function
-   var doc = { name: "PepsiMax", size: "500" };
+     // create the collection object for inserting documents
+     const collection = client.db("SenneSDB").collection(FridgeID);
 
-   // insert the document
-   collection.insertOne(doc, function(err, res) {
-    if (err) throw err;
-    console.log("Document inserted");
+     // populate the document with information from barcode database
+     var doc = { name: "", brand: "", size: "" };
 
-   // need to update and return state
-   client.close();
+     // insert the document into the DB
+     collection.insertOne(doc, function(err, res) {
+      if (err) throw err;
+      console.log("Document inserted");
+
+     // need to update and return state
+     client.close();
+    });
   });
-});
+}
 
-function getSignature(upc, auth) {
-  var crypto    = require('crypto');
-  var algorithm = 'sha1';   
-  var hash, hmac;
+function getUpdates(fridgeID) {
 
-  hmac = crypto.createHmac(algorithm, auth);
-  hmac.update(upc);
-  hash = hmac.digest('base64');
-  // console.log("Hash: ", hash);
+  MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
+     if(err) {
+          console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
+     }
+     console.log('Connected...');
 
+     // create the collection object for retrieving documents
+     const collection = client.db("SenneSDB").collection(FridgeID);
+
+     collection.find().toArray(function(err, items) {
+       console.log(items[0].name);
+     });
+
+     // need to update and return state
+     client.close();
+
+   });
+ }
+
+function removeDoc() {
+  // function to remove item from DB
+  return 1;
 }
