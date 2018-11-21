@@ -1,17 +1,37 @@
 
 const request = require('request');
-var crypto    = require('crypto');
 const MongoClient = require('mongodb').MongoClient;
-const uri = "mongodb+srv://SenneS_Admin:SenneS2018@sennescluster-onimy.mongodb.net/SenneSDB"
+const assert = require('assert');
 
-var upc = "721898049963";
-var FridgeID = "sampleFridgeID";
-//getBarcodeInfo(upc, FridgeID);
-getUpdates(FridgeID);
+// Connection URL
+const url = "mongodb+srv://SenneS_Admin:SenneS2018@sennescluster-onimy.mongodb.net/SenneSDB";
 
-function getBarcodeInfo(barcode) {
+// Database name
+const dbName = "SenneSDB";
 
-    // query for UPCitemdb database
+// Create a global variable for database access
+var dbClient;
+
+// Connect to the Database
+MongoClient.connect(url, { useNewUrlParser: true }, function(err, client) {
+  assert.equal(null, err);
+  console.log("Connected successfully to SenneSDB");
+
+  // Update the dbClient varaiable and use it make connections in functions
+  const dbClient = client.db(dbName);
+
+  // ******************************
+  // I had to make the function call from within this connection because I couldn't get it to work outside of it
+  // Having an issue where the getBarcodeInfo function would call before the DB connectione was made
+  var upc = "012000018794";
+  getBarcodeInfo(dbClient, upc);
+
+});
+
+
+function getBarcodeInfo(dbClient, barcode) {
+
+    // Query for UPCitemdb database
     var query = "https://api.upcitemdb.com/prod/trial/lookup?upc="+barcode;
 
     const options = {
@@ -23,61 +43,34 @@ function getBarcodeInfo(barcode) {
         }
     };
 
-    // parse the returned object for information we want to input to the DB
+    // Parse the barcode information
     request(options, function(err, res, body) {
-        var obj = JSON.parse(body);
-        var title = obj.items[0].title;
-        var brand = obj.items[0].brand;
-        var size = obj.items[0].size;
-        var weight = obj.items[0].weight;
-        var barcodeInfo = {
-          title: title,
-          brand: brand,
-          size: size,
-          weight: weight
-        };
+        var barcodeInfo = JSON.parse(body);
         console.log(barcodeInfo);
 
-        // I had to combine these two functions as I could not work out how to access the returned dictionary
+        // Store the returned JSON object in the Barcodes database
+        const collection = dbClient.collection("Barcodes");
+        collection.insertOne(barcodeInfo, function(err, res) {
+         if (err) throw err;
+         console.log("Barcodes DB Updated");
 
-        MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
-           if(err) {
-                console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
-           }
-           console.log('Connected...');
-
-           // create the collection object for inserting documents
-           const collection = client.db("SenneSDB").collection(FridgeID);
-
-           // populate the document with information from barcode database
-           var doc = { name: barcodeInfo.title , brand: barcodeInfo.brand, size: barcodeInfo.size, weight: barcodeInfo.weight };
-
-           // insert the document into the DB
-           collection.insertOne(doc, function(err, res) {
-            if (err) throw err;
-            console.log("Document inserted");
-
-           // need to update and return state
-           client.close();
-
-          });
+         // I am not sure how to use callback so can't get it to return the barcodeInfo object
+         //callback(barcodeInfo);
         });
     });
 }
 
-function addUpdate(item, FridgeID) {
 
-  MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
-     if(err) {
-          console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
-     }
-     console.log('Connected...');
+function addUpdate(dbClient, item, FridgeID) {
+// update block that is encrypted
+// add fridge_id and increment state
+// need a string
+// id, state and string
 
      // create the collection object for inserting documents
-     const collection = client.db("SenneSDB").collection(FridgeID);
+     const collection = dbClient.db("SenneSDB").collection(Fridges);
 
-     // populate the document with information from barcode database
-     var doc = { name: "", brand: "", size: "" };
+     var doc = { name: barcodeInfo.title , brand: barcodeInfo.brand, size: barcodeInfo.size, weight: barcodeInfo.weight };
 
      // insert the document into the DB
      collection.insertOne(doc, function(err, res) {
@@ -87,19 +80,14 @@ function addUpdate(item, FridgeID) {
      // need to update and return state
      client.close();
     });
-  });
-}
+  }
 
-function getUpdates(fridgeID) {
-
-  MongoClient.connect(uri, { useNewUrlParser: true }, function(err, client) {
-     if(err) {
-          console.log('Error occurred while connecting to MongoDB Atlas...\n',err);
-     }
-     console.log('Connected...');
+function getUpdates(dbClient, fridgeID, state) {
+// Take all updates that are bigger than the state and belong to the fridge
+// return a list of the strings between the two states
 
      // create the collection object for retrieving documents
-     const collection = client.db("SenneSDB").collection(FridgeID);
+     const collection = dbClient.db("SenneSDB").collection(Fridges);
 
      // items from the DB are stored in an array of dictionaries
      collection.find().toArray(function(err, items) {
@@ -110,10 +98,4 @@ function getUpdates(fridgeID) {
 
      // need to update and return state
      client.close();
-   });
- }
-
-function removeDoc() {
-  // function to remove item from DB
-  return 1;
-}
+   }
