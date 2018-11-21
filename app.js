@@ -104,7 +104,7 @@ function getUpdates(fridgeID, currentState, callback) {
      const collection = dbClient.collection("Fridges");
 
      // items from the DB are stored in an array of dictionaries
-     collection.find( { state: { $gt: currentState } }, { fridge_id: fridgeID } ).toArray(function(err, items) {
+     collection.find( { state: { $gt: currentState }, fridge_id : fridgeID }).toArray(function(err, items) {
        if (err) throw err;
        console.log(items);
 
