@@ -1,8 +1,11 @@
-// var app_id = "/+QN4JxDkG59";
-// var user_key = "Hl11J8r8i7At5Bd4";
-// var signature = getSignature(barcode, user_key);
-//
-// var query = "https://digit-eyes.com/gtin/v2_0/?upc_code="+barcode+"&app_key="+app_id+"&signature="+signature+"&language=en&field_names=description,uom,usage,brand";
+var app_id = "/+QN4JxDkG59";
+var user_key = "Hl11J8r8i7At5Bd4";
+var barcode = 049000050110;
+var signature = getSignature(barcode, user_key);
+
+
+var query = "https://digit-eyes.com/gtin/v2_0/?upc_code="+barcode+"&app_key="+app_id+"&signature="+signature+"&language=en&field_names=description,uom,usage,brand";
+console.log(query);
 
 function getSignature(upc, auth) {
   var algorithm = 'sha1';

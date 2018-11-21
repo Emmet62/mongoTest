@@ -11,7 +11,7 @@ const url = "mongodb+srv://SenneS_Admin:SenneS2018@sennescluster-onimy.mongodb.n
 const dbName = "SenneSDB";
 
 // Create a global variable for database access
-var dbClient;
+let dbClient;
 
 // Connect to the Database
 MongoClient.connect(url, { useNewUrlParser: true }, function(err, client) {
@@ -19,24 +19,25 @@ MongoClient.connect(url, { useNewUrlParser: true }, function(err, client) {
   console.log("Connected successfully to SenneSDB");
 
   // Update the dbClient varaiable and use it make connections in functions
-  const dbClient = client.db(dbName);
+  dbClient = client.db(dbName);
 
-  // ******************************
-  // I had to make the function call from within this connection because I couldn't get it to work outside of it
-  // Having an issue where the getBarcodeInfo function would call before the DB connectione was made
-  var upc = "000054491472";
-  //getBarcodeInfo(dbClient, upc);
+  const upc = "049000050110";
+  //getBarcodeInfo(upc, (result) => {
+    //console.log(result);
 
-  var fridgeID = "testFridge2";
-  var state = 3;
-  //addUpdate(dbClient, fridgeID, state, "sampleString");
+  const fridgeID = "abcdef";
 
-  getUpdates(dbClient, fridgeID, state);
+  // addUpdate(fridgeID, "encrpyted", (update) => {
+  //   console.log(update);
+  // });
+
+  getUpdates(fridgeID, 0, (result) => {
+    console.log(result);
+  });
 
 });
 
-
-function getBarcodeInfo(dbClient, barcode) {
+function getBarcodeInfo(barcode, callback) {
 
     // Query for UPCitemdb database
     var query = "https://api.upcitemdb.com/prod/trial/lookup?upc="+barcode;
@@ -52,52 +53,52 @@ function getBarcodeInfo(dbClient, barcode) {
 
     // Parse the barcode information
     request(options, function(err, res, body) {
-        var barcodeInfo = JSON.parse(body);
+        let barcodeInfo = JSON.parse(body);
         console.log(barcodeInfo);
+        let items = barcodeInfo.items[0];
 
         // Store the returned JSON object in the Barcodes database
         const collection = dbClient.collection("Barcodes");
-        collection.insertOne(barcodeInfo, function(err, res) {
+        collection.insertOne(items, function(err, res) {
          if (err) throw err;
          console.log("Barcodes DB Updated");
 
         var result = { barcode: barcode, info: barcodeInfo, error: "null"}
-        console.log(result);
 
-         // I am not sure how to use callback so can't get it to return the barcodeInfo object
-         //callback(result);
+        callback(result);
         });
     });
 }
 
-
-function addUpdate(dbClient, FridgeID, state, update) {
-// id, state and string
+function addUpdate(fridgeID, update, callback) {
 
    // Create the collection object for inserting documents into Fridges database
    const collection = dbClient.collection("Fridges");
 
-   // Generate a random string
-   // var randomstring = randomstring.generate(10);
+   // Query the database to find the current highest state for this fridge
+   collection.find( { fridge_id: fridgeID } ).sort({ state:-1}).limit(1).toArray(function(err, maxState) {
+     if (err) throw err;
+     console.log(maxState.length);
 
-   // *******************************
-   // Not sure how to have a state counter tied to a fridge ID
-   state++;
+     if (maxState.length == 0) {
+      var newState = 1;
+     } else {
+      var newState = maxState[0].state + 1;
+     }
 
-   // Create the document containing the ID, state and string
-   var update = { fridge_id: FridgeID , state: state, string: update };
+     // Create the document containing the ID, state and string
+     let fridgeUpdate = { fridge_id: fridgeID , state: newState, encrpyted_update: update };
 
-   // insert the document into the DB
-   collection.insertOne(update, function(err, res) {
-    if (err) throw err;
-    console.log("Document inserted");
+     // insert the document into the DB
+     collection.insertOne(fridgeUpdate, function(err, res) {
+      if (err) throw err;
 
-  });
+     callback(update);
+     });
+   });
 }
 
-function getUpdates(dbClient, fridgeID, currentState) {
-// Take all updates that are bigger than the state and belong to the fridge
-// return a list of the strings between the two states
+function getUpdates(fridgeID, currentState, callback) {
 
      // create the collection object for retrieving documents
      const collection = dbClient.collection("Fridges");
@@ -105,19 +106,13 @@ function getUpdates(dbClient, fridgeID, currentState) {
      // items from the DB are stored in an array of dictionaries
      collection.find( { state: { $gt: currentState } }, { fridge_id: fridgeID } ).toArray(function(err, items) {
        if (err) throw err;
-       console.log("Documents retrieved")
+       console.log(items);
 
-       var updates = [];
-       for (var i = 0; i < items.length; i++) {
-         updates.push(items[i].string);
-       }
+       var updates = items.map(i => i.encrpyted_update);
        console.log(updates);
 
-       currentState++;
-       var result = { new_state: currentState, update: updates, error: null};
-       console.log(result);
+       var result = { new_state: Math.max(...items.map(i => i.state)), update: updates, error: null};
+
+      callback(result);
      });
-
-     // need to update and return state
-
-   }
+}
